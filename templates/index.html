@@ -243,6 +243,9 @@
         <h1>Episode Running Man</h1>
         <p id="selection-text">Pilih tahun untuk mengambil data episode favoritmu.</p>
         <button id="openModalBtn" onclick="openModal()">Pilih Tahun</button>
+        <div style="margin-top: 20px;">
+            <input type="text" id="searchInput" oninput="searchEpisodes()" placeholder="Cari episode..." style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid var(--border-color);">
+        </div>
         <div id="data-container"></div>
     </div>
 
@@ -345,6 +348,59 @@
         }
 
 
+        function renderTable(episodes) {
+            let htmlContent = '';
+            const caption = `List of Running Man episodes (${currentYear})`;
+
+            if (caption) {
+                htmlContent += `<h3>${caption}</h3>`;
+            }
+
+            if (episodes && episodes.length > 0) {
+                htmlContent += `<div id="save-container" style="text-align: right; margin-bottom: 10px;"><button class="copy-btn" onclick="simpan_json(episodes, 'running_man_${currentYear}.json')">Simpan Semua ke JSON</button></div>`;
+                htmlContent += '<table>';
+                htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th><th>Landmark</th><th>Judul</th><th>Aksi</th></tr></thead>';
+                htmlContent += '<tbody>';
+                episodes.forEach(ep => {
+                    const copyText = `Episode: ${ep.episode}, Tanggal: ${ep.date}, Bintang Tamu: ${ep.guests}, Landmark: ${ep.landmark}, Judul: ${ep.title || ''}`;
+                    const epDataString = JSON.stringify(ep);
+                    htmlContent += `<tr>
+                        <td>${ep.episode}</td>
+                        <td>${ep.date}</td>
+                        <td>${ep.guests}</td>
+                        <td>${ep.landmark}</td>
+                        <td>${ep.title || ''}</td>
+                        <td>
+                            <button class="copy-btn" onclick="copyToClipboard(this, '${copyText.replace(/'/g, "\\'")}')">Salin</button>
+                            <button class="copy-btn" style="margin-left: 5px;" onclick='simpan_json(${epDataString}, "running_man_ep_${ep.episode}.json")'>Simpan</button>
+                        </td>
+                    </tr>`;
+                });
+                htmlContent += '</tbody></table>';
+            } else {
+                htmlContent += `<p class="status">Tidak ada data episode yang ditemukan.</p>`;
+            }
+            dataContainer.innerHTML = htmlContent;
+        }
+
+        function searchEpisodes() {
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            const isNumericQuery = /^\d+$/.test(searchQuery);
+
+            const filteredEpisodes = currentYearEpisodes.filter(ep => {
+                if (isNumericQuery) {
+                    return ep.episode.toLowerCase().includes(searchQuery);
+                } else {
+                    return (
+                        ep.guests.toLowerCase().includes(searchQuery) ||
+                        ep.landmark.toLowerCase().includes(searchQuery) ||
+                        (ep.title && ep.title.toLowerCase().includes(searchQuery))
+                    );
+                }
+            });
+            renderTable(filteredEpisodes);
+        }
+
         async function ambilDataTabel(tahun) {
             const wikiUrl = `https://en.wikipedia.org/wiki/List_of_Running_Man_episodes_(${tahun})`;
             const serverEndpoint = '/ambil-tabel';
@@ -361,39 +417,8 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    const caption = result.caption;
                     currentYearEpisodes = result.episodes_data;
-                    let htmlContent = '';
-
-                    if (caption) {
-                        htmlContent += `<h3>${caption}</h3>`;
-                    }
-
-                    if (currentYearEpisodes && currentYearEpisodes.length > 0) {
-                        htmlContent += `<div id="save-container" style="text-align: right; margin-bottom: 10px;"><button class="copy-btn" onclick="simpan_json(currentYearEpisodes, 'running_man_${currentYear}.json')">Simpan Semua ke JSON</button></div>`;
-                        htmlContent += '<table>';
-                        htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th><th>Landmark</th><th>Judul</th><th>Aksi</th></tr></thead>';
-                        htmlContent += '<tbody>';
-                        currentYearEpisodes.forEach(ep => {
-                            const copyText = `Episode: ${ep.episode}, Tanggal: ${ep.date}, Bintang Tamu: ${ep.guests}, Landmark: ${ep.landmark}, Judul: ${ep.title || ''}`;
-                            const epDataString = JSON.stringify(ep);
-                            htmlContent += `<tr>
-                                <td>${ep.episode}</td>
-                                <td>${ep.date}</td>
-                                <td>${ep.guests}</td>
-                                <td>${ep.landmark}</td>
-                                <td>${ep.title || ''}</td>
-                                <td>
-                                    <button class="copy-btn" onclick="copyToClipboard(this, '${copyText.replace(/'/g, "\\'")}')">Salin</button>
-                                    <button class="copy-btn" style="margin-left: 5px;" onclick='simpan_json(${epDataString}, "running_man_ep_${ep.episode}.json")'>Simpan</button>
-                                </td>
-                            </tr>`;
-                        });
-                        htmlContent += '</tbody></table>';
-                    } else {
-                        htmlContent += `<p class="status">Tidak ada data episode yang ditemukan untuk tahun ${tahun}.</p>`;
-                    }
-                    dataContainer.innerHTML = htmlContent;
+                    renderTable(currentYearEpisodes);
                 } else {
                     dataContainer.innerHTML = `<p class="status" style="color: red;">Error dari server: ${result.error}</p>`;
                 }
