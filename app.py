@@ -44,7 +44,7 @@ def ambil_tabel():
             return jsonify({'error': 'Baris header tabel tidak ditemukan.'}), 404
             
         headers = header_row.find_all('th')
-        episode_col_index, date_col_index, guest_col_index = -1, -1, -1
+        episode_col_index, date_col_index, guest_col_index, landmark_col_index, title_col_index = -1, -1, -1, -1, -1
         
         for i, th in enumerate(headers):
             text_no_space = th.get_text(strip=True).lower().replace(' ', '')
@@ -54,18 +54,23 @@ def ambil_tabel():
                 date_col_index = i
             elif 'guest(s)' in text_no_space:
                 guest_col_index = i
-        
+            elif 'landmark' in text_no_space:
+                landmark_col_index = i
+            elif 'title' in text_no_space:
+                title_col_index = i
+
+        # Kolom 'Title' dan 'Landmark' bersifat opsional
         missing_cols = []
         if episode_col_index == -1: missing_cols.append("'Episode'")
         if date_col_index == -1: missing_cols.append("'Tanggal Siaran'")
         if guest_col_index == -1: missing_cols.append("'Bintang Tamu'")
 
         if missing_cols:
-            error_msg = f"Kolom berikut tidak ditemukan di header: {', '.join(missing_cols)}"
+            error_msg = f"Kolom wajib berikut tidak ditemukan: {', '.join(missing_cols)}"
             logging.error(f"{error_msg} pada URL: {url}")
             return jsonify({'error': error_msg}), 404
         
-        logging.info(f"Indeks kolom: Ep={episode_col_index}, Tanggal={date_col_index}, Tamu={guest_col_index}")
+        logging.info(f"Indeks kolom: Ep={episode_col_index}, Tanggal={date_col_index}, Tamu={guest_col_index}, Landmark={landmark_col_index}, Title={title_col_index}")
 
         episodes_data = []
         rowspan_cells = {}
@@ -78,7 +83,10 @@ def ambil_tabel():
             raw_cells = row.find_all(['th', 'td'])
             processed_cells = []
             col_offset = 0
-            for i in range(len(headers)):
+            
+            max_cols = len(headers)
+            
+            for i in range(max_cols):
                 if i in rowspan_cells:
                     processed_cells.append(rowspan_cells[i]['cell'])
                     rowspan_cells[i]['rows_left'] -= 1
@@ -94,40 +102,59 @@ def ambil_tabel():
                                 if int(cell['rowspan']) > 1:
                                     rowspan_cells[i] = {'rows_left': int(cell['rowspan']) - 1, 'cell': cell}
                             except ValueError: pass
+            
+            if len(processed_cells) < max(episode_col_index, date_col_index, guest_col_index):
+                continue
 
-            if len(processed_cells) > max(episode_col_index, date_col_index, guest_col_index):
-                episode_number_raw = processed_cells[episode_col_index].get_text(strip=True)
-                match = re.search(r'^\d+', episode_number_raw)
+            episode_number_raw = processed_cells[episode_col_index].get_text(strip=True)
+            match = re.search(r'^\d+', episode_number_raw)
+            
+            if match:
+                episode_number = match.group(0)
                 
-                if match:
-                    episode_number = match.group(0)
-                    
-                    date_cell = processed_cells[date_col_index]
-                    broadcast_date = date_cell.find(string=True, recursive=False)
-                    broadcast_date = broadcast_date.strip() if broadcast_date else ""
+                date_cell = processed_cells[date_col_index]
+                broadcast_date = date_cell.find(string=True, recursive=False)
+                broadcast_date = broadcast_date.strip() if broadcast_date else ""
 
-                    guest_cell = processed_cells[guest_col_index]
-                    guest_links = guest_cell.find_all('a')
-                    guest_names = []
-                    if guest_links:
-                        for a in guest_links:
-                            href = a.get('href', '')
-                            text = a.get_text(strip=True)
-                            if text.startswith('[') and text.endswith(']'): continue
-                            if '_(band)' in href or '_(group)' in href: continue
-                            guest_names.append(text)
-                        guests = ', '.join(guest_names)
+                guest_cell = processed_cells[guest_col_index]
+                guest_links = guest_cell.find_all('a')
+                guest_names = []
+                if guest_links:
+                    for a in guest_links:
+                        href = a.get('href', '')
+                        text = a.get_text(strip=True)
+                        if text.startswith('[') and text.endswith(']'): continue
+                        if '_(band)' in href or '_(group)' in href: continue
+                        guest_names.append(text)
+                    guests = ', '.join(guest_names)
+                else:
+                    guests = guest_cell.get_text(strip=True)
+
+                if not guests or guests.lower() == 'no guests':
+                    guests = "Tidak ada bintang tamu"
+                
+                landmark = ""
+                if landmark_col_index != -1 and len(processed_cells) > landmark_col_index:
+                    landmark_cell = processed_cells[landmark_col_index]
+                    landmark_raw = landmark_cell.get_text(separator=" ", strip=True)
+                    landmark = re.sub(r'\s*\[\d+\]\s*', '', landmark_raw).strip()
+
+                title = ""
+                if title_col_index != -1 and len(processed_cells) > title_col_index:
+                    title_cell = processed_cells[title_col_index]
+                    i_tag = title_cell.find('i')
+                    if i_tag:
+                        title = i_tag.get_text(strip=True)
                     else:
-                        guests = guest_cell.get_text(strip=True)
+                        title = title_cell.get_text(strip=True)
 
-                    if not guests or guests.lower() == 'no guests':
-                        guests = "Tidak ada bintang tamu"
-
-                    episodes_data.append({
-                        'episode': episode_number,
-                        'date': broadcast_date,
-                        'guests': guests
-                    })
+                episodes_data.append({
+                    'episode': episode_number,
+                    'date': broadcast_date,
+                    'guests': guests,
+                    'landmark': landmark,
+                    'title': title
+                })
 
         logging.info(f"Berhasil mengekstrak {len(episodes_data)} episode dari {url}")
         return jsonify({

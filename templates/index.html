@@ -202,6 +202,8 @@
             #data-container td:nth-of-type(1):before { content: "Episode"; }
             #data-container td:nth-of-type(2):before { content: "Tanggal"; }
             #data-container td:nth-of-type(3):before { content: "Bintang Tamu"; }
+            #data-container td:nth-of-type(4):before { content: "Landmark"; }
+            #data-container td:nth-of-type(5):before { content: "Judul"; }
             #data-container td:last-child { border-bottom: none; }
         }
     </style>
@@ -278,10 +280,10 @@
 
                     if (episodes && episodes.length > 0) {
                         htmlContent += '<table>';
-                        htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th></tr></thead>';
+                        htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th><th>Landmark</th><th>Judul</th></tr></thead>';
                         htmlContent += '<tbody>';
                         episodes.forEach(ep => {
-                            htmlContent += `<tr><td>${ep.episode}</td><td>${ep.date}</td><td>${ep.guests}</td></tr>`;
+                            htmlContent += `<tr><td>${ep.episode}</td><td>${ep.date}</td><td>${ep.guests}</td><td>${ep.landmark}</td><td>${ep.title || ''}</td></tr>`;
                         });
                         htmlContent += '</tbody></table>';
                     } else {
