@@ -171,5 +171,31 @@ def ambil_tabel():
         logging.exception(f"Terjadi error tak terduga saat memproses {url}:")
         return jsonify({'error': 'Terjadi kesalahan internal pada server. Periksa log untuk detail.'}), 500
 
+@app.route('/ambil-summary')
+def ambil_summary():
+    try:
+        with open('Running Man.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        sup = BeautifulSoup(content, 'html.parser')
+        tabel = sup.find('table', {'class': 'infobox'})
+        
+        if not tabel:
+            return jsonify({'error': 'Tidak ada tabel infobox yang ditemukan.'}), 404
+
+        tbody = tabel.find('tbody')
+        if not tbody:
+            return jsonify({'error': 'Tidak ada tbody yang ditemukan.'}), 404
+
+        for a in tbody.find_all('a', href=True):
+            if a['href'].startswith('/'):
+                a['href'] = 'https://en.wikipedia.org' + a['href']
+
+        return jsonify({'summary_html': str(tbody)})
+
+    except Exception as e:
+        logging.exception("Terjadi error tak terduga saat memproses summary:")
+        return jsonify({'error': 'Terjadi kesalahan internal pada server.'}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

@@ -18,8 +18,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            flex-direction: column;
+            align-items: center;
             min-height: 100vh;
             margin: 0;
             background-color: var(--bg-color);
@@ -108,7 +108,6 @@
             background-color: rgba(0,0,0,0.5);
             animation: fadeIn 0.3s ease-out;
             /* Perbaikan: Gunakan Flexbox untuk centering */
-            display: flex;
             align-items: center;
             justify-content: center;
         }
@@ -153,6 +152,35 @@
         .year-grid button:hover {
             background-color: #e2e6ea;
             transform: translateY(-2px);
+        }
+
+        #summary-container table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        #summary-container th, #summary-container td {
+            border: 1px solid var(--border-color);
+            padding: 12px 15px;
+            text-align: left;
+        }
+        #summary-container th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            width: 30%;
+        }
+
+        .copy-btn {
+            padding: 5px 10px;
+            border: 1px solid var(--primary-color);
+            border-radius: 5px;
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .copy-btn:hover {
+            background-color: var(--primary-hover-color);
         }
 
         /* Animations */
@@ -204,6 +232,7 @@
             #data-container td:nth-of-type(3):before { content: "Bintang Tamu"; }
             #data-container td:nth-of-type(4):before { content: "Landmark"; }
             #data-container td:nth-of-type(5):before { content: "Judul"; }
+            #data-container td:nth-of-type(6):before { content: "Aksi"; }
             #data-container td:last-child { border-bottom: none; }
         }
     </style>
@@ -215,6 +244,11 @@
         <p id="selection-text">Pilih tahun untuk mengambil data episode favoritmu.</p>
         <button id="openModalBtn" onclick="openModal()">Pilih Tahun</button>
         <div id="data-container"></div>
+    </div>
+
+    <div id="summary-container" class="container" style="margin-top: 20px;">
+        <h2>Ringkasan Running Man</h2>
+        <div id="summary-data"></div>
     </div>
 
     <!-- Modal -->
@@ -230,8 +264,10 @@
         const modal = document.getElementById('yearModal');
         const dataContainer = document.getElementById('data-container');
         const selectionText = document.getElementById('selection-text');
+        let currentYearEpisodes = [];
+        let currentYear = '';
 
-        function openModal() { modal.style.display = "block"; }
+        function openModal() { modal.style.display = "flex"; }
         function closeModal() { modal.style.display = "none"; }
 
         window.onclick = function(event) {
@@ -242,6 +278,7 @@
 
         function selectYear(tahun) {
             closeModal();
+            currentYear = tahun;
             selectionText.textContent = `Menampilkan data untuk tahun ${tahun}...`;
             ambilDataTabel(tahun);
         }
@@ -253,6 +290,60 @@
             button.onclick = () => selectYear(year);
             yearGrid.appendChild(button);
         }
+
+        async function ambilDataRingkasan() {
+            const serverEndpoint = '/ambil-summary';
+            const summaryContainer = document.getElementById('summary-data');
+            summaryContainer.innerHTML = '<p class="status">Mengambil data ringkasan...</p>';
+
+            try {
+                const response = await fetch(serverEndpoint);
+                const result = await response.json();
+
+                if (response.ok) {
+                    summaryContainer.innerHTML = `<table>${result.summary_html}</table>`;
+                } else {
+                    summaryContainer.innerHTML = `<p class="status" style="color: red;">Error dari server: ${result.error}</p>`;
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                summaryContainer.innerHTML = '<p class="status" style="color: red;">Gagal terhubung ke server Python. Pastikan app.py berjalan.</p>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', ambilDataRingkasan);
+
+        function copyToClipboard(button, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.innerText;
+                button.innerText = 'Disalin!';
+                setTimeout(() => {
+                    button.innerText = originalText;
+                }, 2000); // 2 seconds
+            }, (err) => {
+                console.error('Gagal menyalin teks: ', err);
+            });
+        }
+
+        function simpan_json(data, filename) {
+            if (!data) {
+                console.error('No data to save.');
+                return;
+            }
+
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'data.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert('Data berhasil disimpan sebagai ' + (filename || 'data.json'));
+        }
+
 
         async function ambilDataTabel(tahun) {
             const wikiUrl = `https://en.wikipedia.org/wiki/List_of_Running_Man_episodes_(${tahun})`;
@@ -271,19 +362,32 @@
 
                 if (response.ok) {
                     const caption = result.caption;
-                    const episodes = result.episodes_data;
+                    currentYearEpisodes = result.episodes_data;
                     let htmlContent = '';
 
                     if (caption) {
                         htmlContent += `<h3>${caption}</h3>`;
                     }
 
-                    if (episodes && episodes.length > 0) {
+                    if (currentYearEpisodes && currentYearEpisodes.length > 0) {
+                        htmlContent += `<div id="save-container" style="text-align: right; margin-bottom: 10px;"><button class="copy-btn" onclick="simpan_json(currentYearEpisodes, 'running_man_${currentYear}.json')">Simpan Semua ke JSON</button></div>`;
                         htmlContent += '<table>';
-                        htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th><th>Landmark</th><th>Judul</th></tr></thead>';
+                        htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th><th>Landmark</th><th>Judul</th><th>Aksi</th></tr></thead>';
                         htmlContent += '<tbody>';
-                        episodes.forEach(ep => {
-                            htmlContent += `<tr><td>${ep.episode}</td><td>${ep.date}</td><td>${ep.guests}</td><td>${ep.landmark}</td><td>${ep.title || ''}</td></tr>`;
+                        currentYearEpisodes.forEach(ep => {
+                            const copyText = `Episode: ${ep.episode}, Tanggal: ${ep.date}, Bintang Tamu: ${ep.guests}, Landmark: ${ep.landmark}, Judul: ${ep.title || ''}`;
+                            const epDataString = JSON.stringify(ep);
+                            htmlContent += `<tr>
+                                <td>${ep.episode}</td>
+                                <td>${ep.date}</td>
+                                <td>${ep.guests}</td>
+                                <td>${ep.landmark}</td>
+                                <td>${ep.title || ''}</td>
+                                <td>
+                                    <button class="copy-btn" onclick="copyToClipboard(this, '${copyText.replace(/'/g, "\\'")}')">Salin</button>
+                                    <button class="copy-btn" style="margin-left: 5px;" onclick='simpan_json(${epDataString}, "running_man_ep_${ep.episode}.json")'>Simpan</button>
+                                </td>
+                            </tr>`;
                         });
                         htmlContent += '</tbody></table>';
                     } else {
