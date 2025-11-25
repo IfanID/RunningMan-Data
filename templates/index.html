@@ -486,7 +486,7 @@
             htmlContent += yearNavigation;
 
             if (episodes && episodes.length > 0) {
-                htmlContent += `<div id="save-container" style="text-align: right; margin-bottom: 10px;"><button class="copy-btn" onclick="simpan_json(episodes, 'running_man_${currentYear}.json')">Simpan Semua ke JSON</button></div>`;
+                htmlContent += `<div id="save-container" style="text-align: right; margin-bottom: 10px;"><button class="copy-btn" onclick="simpan_json(currentYearEpisodes, 'running_man_${currentYear}.json')">Simpan Semua ke JSON</button></div>`;
                 htmlContent += '<table>';
                 htmlContent += '<thead><tr><th>No. Episode</th><th>Tanggal Siaran</th><th>Bintang Tamu</th><th>Landmark</th><th>Judul</th><th>Aksi</th></tr></thead>';
                 htmlContent += '<tbody>';
