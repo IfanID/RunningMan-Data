@@ -215,6 +215,33 @@
             bottom: 30px;
         }
 
+        .year-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+
+        .year-nav button {
+            padding: 8px 15px;
+            font-size: 14px;
+            background-color: #333;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .year-nav button:hover {
+            background-color: #444;
+        }
+
+        .year-nav .current-year {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideIn { from { transform: translateY(-40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -320,6 +347,8 @@
             closeModal();
             currentYear = tahun;
             selectionText.textContent = `Menampilkan data untuk tahun ${tahun}...`;
+            document.getElementById('searchInput').value = '';
+            dataContainer.innerHTML = '<p class="status">Mengambil data...</p>';
             ambilDataTabel(tahun);
         }
 
@@ -353,7 +382,16 @@
 
         document.addEventListener('DOMContentLoaded', ambilDataRingkasan);
 
-        function copyToClipboard(button, text) {
+        function unicode_to_b64(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+
+        function b64_to_unicode(str) {
+            return decodeURIComponent(escape(atob(str)));
+        }
+
+        function copyToClipboard(button, encodedText) {
+            const text = b64_to_unicode(encodedText);
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = button.innerText;
                 button.innerText = 'Disalin!';
@@ -394,7 +432,8 @@
             }, 3000); // 3 seconds
         }
 
-        function copyCellContent(text) {
+        function copyCellContent(encodedText) {
+            const text = b64_to_unicode(encodedText);
             navigator.clipboard.writeText(text).then(() => {
                 showToast('Teks berhasil disalin!');
             }, (err) => {
@@ -403,13 +442,48 @@
             });
         }
 
+        function renderYearNavigation(year) {
+            const currentYear = parseInt(year);
+            const prevYear = currentYear - 1;
+            const nextYear = currentYear + 1;
+
+            let html = '<div class="year-nav">';
+
+            if (currentYear > 2010) {
+                html += `<button onclick="selectYear(${prevYear})">&laquo; ${prevYear}</button>`;
+            } else {
+                html += '<div></div>'; // Placeholder for alignment
+            }
+
+            html += `<span class="current-year">${currentYear}</span>`;
+
+            if (currentYear < 2025) {
+                html += `<button onclick="selectYear(${nextYear})">${nextYear} &raquo;</button>`;
+            } else {
+                html += '<div></div>'; // Placeholder for alignment
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function saveEpisode(episodeNumber) {
+            const episode = currentYearEpisodes.find(ep => ep.episode === episodeNumber);
+            if (episode) {
+                simpan_json(episode, `running_man_ep_${episodeNumber}.json`);
+            }
+        }
+
         function renderTable(episodes) {
             let htmlContent = '';
             const caption = `List of Running Man episodes (${currentYear})`;
+            const yearNavigation = renderYearNavigation(currentYear);
 
             if (caption) {
                 htmlContent += `<h3>${caption}</h3>`;
             }
+
+            htmlContent += yearNavigation;
 
             if (episodes && episodes.length > 0) {
                 htmlContent += `<div id="save-container" style="text-align: right; margin-bottom: 10px;"><button class="copy-btn" onclick="simpan_json(episodes, 'running_man_${currentYear}.json')">Simpan Semua ke JSON</button></div>`;
@@ -418,16 +492,15 @@
                 htmlContent += '<tbody>';
                 episodes.forEach(ep => {
                     const copyText = `Episode: ${ep.episode}, Tanggal: ${ep.date}, Bintang Tamu: ${ep.guests}, Landmark: ${ep.landmark}, Judul: ${ep.title || ''}`;
-                    const epDataString = JSON.stringify(ep);
                     htmlContent += `<tr>
                         <td data-label="Episode">${ep.episode}</td>
-                        <td data-label="Tanggal">${ep.date} <span class="copy-icon" onclick="copyCellContent('${ep.date}')">&#128203;</span></td>
-                        <td data-label="Bintang Tamu">${ep.guests} <span class="copy-icon" onclick="copyCellContent('${ep.guests.replace(/'/g, "\\'")}')">&#128203;</span></td>
-                        <td data-label="Landmark">${ep.landmark} <span class="copy-icon" onclick="copyCellContent('${ep.landmark.replace(/'/g, "\\'")}')">&#128203;</span></td>
-                        <td data-label="Judul">${ep.title || ''} <span class="copy-icon" onclick="copyCellContent('${(ep.title || '').replace(/'/g, "\\'")}')">&#128203;</span></td>
+                        <td data-label="Tanggal">${ep.date} <span class="copy-icon" onclick="copyCellContent('${unicode_to_b64(ep.date)}')">&#128203;</span></td>
+                        <td data-label="Bintang Tamu">${ep.guests} <span class="copy-icon" onclick="copyCellContent('${unicode_to_b64(ep.guests)}')">&#128203;</span></td>
+                        <td data-label="Landmark">${ep.landmark} <span class="copy-icon" onclick="copyCellContent('${unicode_to_b64(ep.landmark)}')">&#128203;</span></td>
+                        <td data-label="Judul">${ep.title || ''} <span class="copy-icon" onclick="copyCellContent('${unicode_to_b64(ep.title || '')}')">&#128203;</span></td>
                         <td data-label="Aksi">
-                            <button class="copy-btn" onclick="copyToClipboard(this, '${copyText.replace(/'/g, "\\'")}')">Salin</button>
-                            <button class="copy-btn" style="margin-left: 5px;" onclick='simpan_json(${epDataString}, "running_man_ep_${ep.episode}.json")'>Simpan</button>
+                            <button class="copy-btn" onclick="copyToClipboard(this, '${unicode_to_b64(copyText)}')">Salin</button>
+                            <button class="copy-btn" style="margin-left: 5px;" onclick="saveEpisode('${ep.episode}')">Simpan</button>
                         </td>
                     </tr>`;
                 });
@@ -435,6 +508,9 @@
             } else {
                 htmlContent += `<p class="status">Tidak ada data episode yang ditemukan.</p>`;
             }
+
+            htmlContent += yearNavigation;
+
             dataContainer.innerHTML = htmlContent;
         }
 
